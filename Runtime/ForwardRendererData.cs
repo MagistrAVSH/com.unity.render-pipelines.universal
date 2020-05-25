@@ -40,9 +40,6 @@ namespace UnityEngine.Rendering.Universal
             [Reload("Shaders/Utils/CopyDepth.shader")]
             public Shader copyDepthPS;
 
-            [Reload("Shaders/Utils/ScreenSpaceShadows.shader")]
-            public Shader screenSpaceShadowPS;
-
             [Reload("Shaders/Utils/Sampling.shader")]
             public Shader samplingPS;
 

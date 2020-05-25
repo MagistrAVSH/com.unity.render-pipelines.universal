@@ -43,7 +43,6 @@ namespace UnityEngine.Rendering.Universal.Internal
         ColorLookup m_ColorLookup;
         ColorAdjustments m_ColorAdjustments;
         Tonemapping m_Tonemapping;
-        FilmGrain m_FilmGrain;
 
         // Misc
         const int k_MaxPyramidSize = 16;
@@ -175,7 +174,6 @@ namespace UnityEngine.Rendering.Universal.Internal
             m_ColorLookup         = stack.GetComponent<ColorLookup>();
             m_ColorAdjustments    = stack.GetComponent<ColorAdjustments>();
             m_Tonemapping         = stack.GetComponent<Tonemapping>();
-            m_FilmGrain           = stack.GetComponent<FilmGrain>();
 
             if (m_IsFinalPass)
             {
@@ -629,56 +627,7 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         void DoBokehDepthOfField(CommandBuffer cmd, int source, int destination, Rect pixelRect)
         {
-            var material = m_Materials.bokehDepthOfField;
-            int wh = m_Descriptor.width / 2;
-            int hh = m_Descriptor.height / 2;
-
-            // "A Lens and Aperture Camera Model for Synthetic Image Generation" [Potmesil81]
-            float F = m_DepthOfField.focalLength.value / 1000f;
-            float A = m_DepthOfField.focalLength.value / m_DepthOfField.aperture.value;
-            float P = m_DepthOfField.focusDistance.value;
-            float maxCoC = (A * F) / (P - F);
-            float maxRadius = GetMaxBokehRadiusInPixels(m_Descriptor.height);
-            float rcpAspect = 1f / (wh / (float)hh);
-
-            cmd.SetGlobalVector(ShaderConstants._CoCParams, new Vector4(P, maxCoC, maxRadius, rcpAspect));
-
-            // Prepare the bokeh kernel constant buffer
-            int hash = m_DepthOfField.GetHashCode(); // TODO: GC fix
-            if (hash != m_BokehHash)
-            {
-                m_BokehHash = hash;
-                PrepareBokehKernel();
-            }
-
-            cmd.SetGlobalVectorArray(ShaderConstants._BokehKernel, m_BokehKernel);
-
-            // Temporary textures
-            cmd.GetTemporaryRT(ShaderConstants._FullCoCTexture, GetStereoCompatibleDescriptor(m_Descriptor.width, m_Descriptor.height, GraphicsFormat.R8_UNorm), FilterMode.Bilinear);
-            cmd.GetTemporaryRT(ShaderConstants._PingTexture, GetStereoCompatibleDescriptor(wh, hh, GraphicsFormat.R16G16B16A16_SFloat), FilterMode.Bilinear);
-            cmd.GetTemporaryRT(ShaderConstants._PongTexture, GetStereoCompatibleDescriptor(wh, hh, GraphicsFormat.R16G16B16A16_SFloat), FilterMode.Bilinear);
-
-            // Compute CoC
-            cmd.Blit(source, ShaderConstants._FullCoCTexture, material, 0);
-            cmd.SetGlobalTexture(ShaderConstants._FullCoCTexture, ShaderConstants._FullCoCTexture);
-
-            // Downscale & prefilter color + coc
-            cmd.Blit(source, ShaderConstants._PingTexture, material, 1);
-
-            // Bokeh blur
-            cmd.Blit(ShaderConstants._PingTexture, ShaderConstants._PongTexture, material, 2);
-
-            // Post-filtering
-            cmd.Blit(ShaderConstants._PongTexture, BlitDstDiscardContent(cmd, ShaderConstants._PingTexture), material, 3);
-
-            // Composite
-            cmd.SetGlobalTexture(ShaderConstants._DofTexture, ShaderConstants._PingTexture);
-            cmd.Blit(source, BlitDstDiscardContent(cmd, destination), material, 4);
-
-            // Cleanup
-            cmd.ReleaseTemporaryRT(ShaderConstants._FullCoCTexture);
-            cmd.ReleaseTemporaryRT(ShaderConstants._PingTexture);
-            cmd.ReleaseTemporaryRT(ShaderConstants._PongTexture);
+            
         }
 
         #endregion
@@ -1015,16 +964,6 @@ namespace UnityEngine.Rendering.Universal.Internal
 
         void SetupGrain(in CameraData cameraData, Material material)
         {
-            if (!m_HasFinalPass && m_FilmGrain.IsActive())
-            {
-                material.EnableKeyword(ShaderKeywordStrings.FilmGrain);
-                PostProcessUtils.ConfigureFilmGrain(
-                    m_Data,
-                    m_FilmGrain,
-                    cameraData.pixelWidth, cameraData.pixelHeight,
-                    material
-                );
-            }
         }
 
         #endregion
@@ -1096,7 +1035,6 @@ namespace UnityEngine.Rendering.Universal.Internal
             public readonly Material stopNaN;
             public readonly Material subpixelMorphologicalAntialiasing;
             public readonly Material gaussianDepthOfField;
-            public readonly Material bokehDepthOfField;
             public readonly Material cameraMotionBlur;
             public readonly Material paniniProjection;
             public readonly Material bloom;
@@ -1108,7 +1046,6 @@ namespace UnityEngine.Rendering.Universal.Internal
                 stopNaN = Load(data.shaders.stopNanPS);
                 subpixelMorphologicalAntialiasing = Load(data.shaders.subpixelMorphologicalAntialiasingPS);
                 gaussianDepthOfField = Load(data.shaders.gaussianDepthOfFieldPS);
-                bokehDepthOfField = Load(data.shaders.bokehDepthOfFieldPS);
                 cameraMotionBlur = Load(data.shaders.cameraMotionBlurPS);
                 paniniProjection = Load(data.shaders.paniniProjectionPS);
                 bloom = Load(data.shaders.bloomPS);
@@ -1136,7 +1073,6 @@ namespace UnityEngine.Rendering.Universal.Internal
                 CoreUtils.Destroy(stopNaN);
                 CoreUtils.Destroy(subpixelMorphologicalAntialiasing);
                 CoreUtils.Destroy(gaussianDepthOfField);
-                CoreUtils.Destroy(bokehDepthOfField);
                 CoreUtils.Destroy(cameraMotionBlur);
                 CoreUtils.Destroy(paniniProjection);
                 CoreUtils.Destroy(bloom);

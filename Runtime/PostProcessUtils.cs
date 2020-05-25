@@ -42,38 +42,9 @@ namespace UnityEngine.Rendering.Universal
 
             return index;
         }
+        
 
-        [System.Obsolete("This method is obsolete. Use ConfigureFilmGrain override that takes camera pixel width and height instead.")]
-        public static void ConfigureFilmGrain(PostProcessData data, FilmGrain settings, Camera camera, Material material)
-        {
-            ConfigureFilmGrain(data, settings, camera.pixelWidth, camera.pixelHeight, material);
-        }
-
-        // TODO: Add API docs
-        public static void ConfigureFilmGrain(PostProcessData data, FilmGrain settings, int cameraPixelWidth, int cameraPixelHeight, Material material)
-        {
-            var texture = settings.texture.value;
-
-            if (settings.type.value != FilmGrainLookup.Custom)
-                texture = data.textures.filmGrainTex[(int)settings.type.value];
-
-            #if LWRP_DEBUG_STATIC_POSTFX
-            float offsetX = 0f;
-            float offsetY = 0f;
-            #else
-            float offsetX = Random.value;
-            float offsetY = Random.value;
-            #endif
-
-            var tilingParams = texture == null
-                ? Vector4.zero
-                : new Vector4(cameraPixelWidth / (float)texture.width, cameraPixelHeight / (float)texture.height, offsetX, offsetY);
-
-            material.SetTexture(ShaderConstants._Grain_Texture, texture);
-            material.SetVector(ShaderConstants._Grain_Params, new Vector2(settings.intensity.value * 4f, settings.response.value));
-            material.SetVector(ShaderConstants._Grain_TilingParams, tilingParams);
-        }
-
+      
         // Precomputed shader ids to same some CPU cycles (mostly affects mobile)
         static class ShaderConstants
         {
